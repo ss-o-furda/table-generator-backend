@@ -4,12 +4,21 @@ from starlette.datastructures import Secret
 
 config = Config(".env")
 
+TESTING = config("TESTING", cast=bool, default=False)
+
 DB_DRIVER = config("DB_DRIVER", default="postgresql")
 DB_HOST = config("DB_HOST", default=None)
 DB_PORT = config("DB_PORT", cast=int, default=None)
 DB_USER = config("DB_USER", default=None)
 DB_PASSWORD = config("DB_PASSWORD", cast=Secret, default=None)
 DB_DATABASE = config("DB_DATABASE", default=None)
+
+if TESTING:
+    if DB_DATABASE:
+        DB_DATABASE += "_test"
+    else:
+        DB_DATABASE = "tabgen_test"
+
 DB_DSN = config(
     "DB_DSN",
     cast=make_url,
