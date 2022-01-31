@@ -1,7 +1,14 @@
-from fastapi import FastAPI
-from .models import db
 import logging
-from importlib.metadata import entry_points
+
+import click
+from fastapi import FastAPI
+
+from .models import db
+
+try:
+    from importlib.metadata import entry_points
+except ImportError:  # pragma: no cover
+    from importlib_metadata import entry_points
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +22,11 @@ def get_app():
 
 def load_modules(app=None):
     for ep in entry_points()["table_generator_backend.modules"]:
-        logger.info("Loading module: %s", ep.name)
+        logger.info(
+            "Loading module: %s",
+            ep.name,
+            extra={"color_message": "Loading module: " + click.style("%s", fg="cyan")},
+        )
         mod = ep.load()
         if app:
             init_app = getattr(mod, "init_app", None)
