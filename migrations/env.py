@@ -1,9 +1,23 @@
+import logging
+import os
+import sys
+import time
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
+from table_generator_backend.config import DB_DSN, DB_RETRY_LIMIT, DB_RETRY_INTERVAL
+from table_generator_backend.main import get_app, db
+from sqlalchemy import engine_from_config, pool
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
+
+get_app()
+target_metadata = db
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -13,22 +27,7 @@ config = context.config
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-from table_generator_backend.config import DB_DSN
-from table_generator_backend.main import db, load_modules
-
-load_modules()
-
 config.set_main_option("sqlalchemy.url", str(DB_DSN))
-target_metadata = db
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
 
 
 def run_migrations_offline():
@@ -68,7 +67,22 @@ def run_migrations_online():
         poolclass=pool.NullPool,
     )
 
-    with connectable.connect() as connection:
+    retries = 0
+    while True:
+        try:
+            retries += 1
+            connection = connectable.connect()
+        except Exception:
+            if retries < DB_RETRY_LIMIT:
+                logging.info("Waiting for the database to start...")
+                time.sleep(DB_RETRY_INTERVAL)
+            else:
+                logging.error("Max retries reached.")
+                raise
+        else:
+            break
+
+    with connection:
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
